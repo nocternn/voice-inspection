@@ -1,0 +1,3 @@
+include ':jfftpack'
+include ':app'
+rootProject.name = "MITECH Voice Inspection"

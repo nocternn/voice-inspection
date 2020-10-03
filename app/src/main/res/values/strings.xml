@@ -1,0 +1,21 @@
+<resources>
+    <string name="app_name">MITECH Voice Inspection</string>
+    <string name="placeholder">Placeholder</string>
+
+    <!-- Visualizers -->
+    <string name="visualizer_analog">Amplitude vs Time(s)</string>
+    <string name="visualizer_digital">Amplitude vs Frequency(Hz)</string>
+
+    <!-- Buttons -->
+    <string name="btn_predict">Predict</string>
+    <string name="btn_add">Add Sample</string>
+    <string name="btn_train">Train</string>
+
+    <!-- File class -->
+    <string name="txt_sample_type1">OK</string>
+    <string name="txt_sample_type2">NG</string>
+
+    <!-- Media Player -->
+    <string name="player_title">Media Player</string>
+    <string name="player_state_stop">Not Playing</string>
+</resources>

@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <dimen name="margin_widgets">10dp</dimen>
+
+    <!-- Visualizer -->
+    <dimen name="visualizer_container_height">200dp</dimen>
+    <dimen name="visualizer_chunk_space">1dp</dimen>
+    <dimen name="visualizer_chunk_width">2dp</dimen>
+    <dimen name="visualizer_visual_max_height">180dp</dimen>
+    <dimen name="visualizer_visual_min_height">2dp</dimen>
+
+    <!-- Buttons -->
+    <dimen name="btn_height">75dp</dimen>
+    <dimen name="btn_width">150dp</dimen>
+    <dimen name="btn_elevation">2dp</dimen>
+
+    <!-- Switch -->
+    <dimen name="switch_height">24dp</dimen>
+    <dimen name="switch_width">50dp</dimen>
+</resources>
