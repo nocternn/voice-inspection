@@ -2,17 +2,33 @@ package com.example.mitechvoiceinspection;
 
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.appcompat.widget.Toolbar;
+import androidx.constraintlayout.widget.ConstraintLayout;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
+import androidx.core.content.res.ResourcesCompat;
 
 import android.Manifest;
 import android.app.Activity;
+import android.app.AlertDialog;
+import android.content.DialogInterface;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
+import android.media.AudioFormat;
+import android.media.AudioRecord;
 import android.media.MediaRecorder;
 import android.os.Bundle;
+import android.text.InputType;
 import android.util.Log;
+import android.view.LayoutInflater;
+import android.view.Menu;
+import android.view.MenuItem;
 import android.view.View;
+import android.view.ViewGroup;
+import android.widget.EditText;
+import android.widget.ImageButton;
+import android.widget.LinearLayout;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import com.github.mikephil.charting.charts.LineChart;
@@ -26,6 +42,7 @@ import com.github.mikephil.charting.highlight.Highlight;
 import com.github.mikephil.charting.interfaces.datasets.ILineDataSet;
 import com.github.mikephil.charting.listener.OnChartValueSelectedListener;
 import com.github.mikephil.charting.utils.ColorTemplate;
+import com.google.android.material.bottomsheet.BottomSheetBehavior;
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
 import com.visualizer.amplitude.AudioRecordView;
 
@@ -41,7 +58,6 @@ import java.util.TimerTask;
 
 public class MainActivity extends AppCompatActivity implements OnChartValueSelectedListener {
     private static final String LOG_TAG = "AudioRecordTest";
-    private Activity activity = this;
 
 
     // Requesting permissions
@@ -55,11 +71,18 @@ public class MainActivity extends AppCompatActivity implements OnChartValueSelec
 
 
     private boolean isRecording = false;
+    private Toolbar toolbar;
+//    // Media player
+    private ConstraintLayout playerSheet;
+    private BottomSheetBehavior playerSheetBehavior;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+
+        toolbar = findViewById(R.id.toolbar);
+        setSupportActionBar(toolbar);
 
         visualizerAnalog = findViewById(R.id.visualizer_analog);
         initializeVisualizer(visualizerAnalog, "analog");
@@ -74,7 +97,7 @@ public class MainActivity extends AppCompatActivity implements OnChartValueSelec
             @Override
             public void onClick(View v) {
                 if (ContextCompat.checkSelfPermission(getApplicationContext(), Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_DENIED) {
-                    ActivityCompat.requestPermissions(activity, permissions, REQUEST_RECORD_AUDIO_PERMISSION);
+                    ActivityCompat.requestPermissions(MainActivity.this, permissions, REQUEST_RECORD_AUDIO_PERMISSION);
                 } else {
                     if (!isRecording) {
                         btnRecord.setImageResource(R.drawable.ic_btn_record_stop);
@@ -87,12 +110,52 @@ public class MainActivity extends AppCompatActivity implements OnChartValueSelec
                 }
             }
         });
+
+
+        // Media player
+        playerSheet = findViewById(R.id.player_sheet);
+        playerSheetBehavior = BottomSheetBehavior.from(playerSheet);
+
+        playerSheetBehavior.addBottomSheetCallback(new BottomSheetBehavior.BottomSheetCallback() {
+            @Override
+            public void onStateChanged(@NonNull View bottomSheet, int newState) {
+                switch (newState) {
+                    case BottomSheetBehavior.STATE_HIDDEN:
+                        playerSheetBehavior.setState(BottomSheetBehavior.STATE_COLLAPSED);
+                        break;
+                    case BottomSheetBehavior.STATE_EXPANDED:
+                        break;
+                    case BottomSheetBehavior.STATE_COLLAPSED:
+                        break;
+                    case BottomSheetBehavior.STATE_DRAGGING:
+                        break;
+                    case BottomSheetBehavior.STATE_SETTLING:
+                        break;
+                }
+            }
+
+            @Override
+            public void onSlide(@NonNull View bottomSheet, float slideOffset) {}
+        });
+    }
+
+    @Override
+    public boolean onCreateOptionsMenu(Menu menu) {
+        getMenuInflater().inflate(R.menu.menu_toolbar, menu);
+        return true;
+    }
+
+    @Override
+    public boolean onOptionsItemSelected(@NonNull MenuItem item) {
+        showTextInputDialog(item.getItemId());
+        return true;
     }
 
 
     // Visualizers
     private LineChart visualizerAnalog;
     private LineChart visualizerDigital;
+    private int minFreq = 0, maxFreq = 400;
 
     private void initializeVisualizer(LineChart mChart, String chartType) {
         mChart.setOnChartValueSelectedListener(this);
@@ -129,7 +192,8 @@ public class MainActivity extends AppCompatActivity implements OnChartValueSelec
         XAxis axisX = mChart.getXAxis();
         axisX.setPosition(XAxis.XAxisPosition.BOTTOM);
         if (!chartType.equals("analog")) {
-            axisX.setAxisMaximum((float) SAMPLING_RATE / 2);
+            axisX.setAxisMinimum(minFreq);
+            axisX.setAxisMaximum(maxFreq);
         }
         axisX.setAvoidFirstLastClipping(true);
         axisX.setTextColor(ContextCompat.getColor(getApplicationContext(), R.color.textColor));
@@ -186,22 +250,79 @@ public class MainActivity extends AppCompatActivity implements OnChartValueSelec
         set.setValueTextColor(Color.WHITE);
         set.setValueTextSize(9f);
         set.setDrawValues(false);
+        set.setDrawCircles(false);
         return set;
+    }
+
+    private void drawVisualizerFFT() {
+        double frequencyResolution = samplingRate / (double)rawAudio.length;
+        Log.i(LOG_TAG, Integer.toString(rawAudio.length));
+        if (rawAudio.length % 2 == 0) {
+//            addEntry(visualizerDigital, new Entry(0, (float)rawAudio[0]));
+            for (int k = 1; k < rawAudio.length / 2; k++) {
+                double frequency = k * frequencyResolution;
+
+                double real = rawAudio[2*k];
+                double imaginary = rawAudio[2*k + 1];
+                double magnitude = Math.sqrt(Math.pow(real, 2) + Math.pow(imaginary, 2));
+
+                if (frequency >= minFreq && frequency <= maxFreq && magnitude >= MAGNITUDE_THRESHOLD) {
+                    addEntry(visualizerDigital, new Entry((float) frequency, (float) magnitude));
+                } else {
+                    addEntry(visualizerDigital, new Entry((float)frequency, 0));
+                }
+
+            }
+//            addEntry(visualizerDigital, new Entry(((float)rawAudio.length / 2) * frequencyResolution, (float)rawAudio[1]));
+        } else {
+//            addEntry(visualizerDigital, new Entry(0, (float) rawAudio[0]));
+            for (int k = 1; k < (rawAudio.length - 1) / 2; k++) {
+                double frequency = k * frequencyResolution;
+
+                double real = rawAudio[2*k];
+                double imaginary = rawAudio[2*k + 1];
+                double magnitude = Math.sqrt(Math.pow(real, 2) + Math.pow(imaginary, 2));
+
+                if (frequency >= minFreq && frequency <= maxFreq && magnitude >= MAGNITUDE_THRESHOLD) {
+                    addEntry(visualizerDigital, new Entry((float)frequency, (float)magnitude));
+                } else {
+                    addEntry(visualizerDigital, new Entry((float)frequency, 0));
+                }
+            }
+//            addEntry(visualizerDigital, new Entry(((float)(rawAudio.length - 1) / 2) * frequencyResolution, (float)rawAudio[1]));
+        }
+    }
+
+    @Override
+    public void onValueSelected(Entry e, Highlight h) {
+        Log.i("Entry selected", e.toString());
+    }
+
+    @Override
+    public void onNothingSelected() {
+        Log.i("Nothing selected", "Nothing selected.");
     }
 
 
     // Recording audio
-    private MediaRecorder recorder = null;
+    private static final float MAX_REPORTABLE_AMP = 32767f;
+    private static final float MAX_REPORTABLE_DB = 90.3087f;
+
+    private MediaRecorder recorder;
+    private int samplingRate = maxFreq / 2;
+
     private Timer recordingTimer;
-    private int SAMPLING_RATE = 44100;
-    private int ENCODING_BITRATE = 384000;
-    private int PERIOD = 100;
+    private int PERIOD = (int) ((1.0 / samplingRate) * 1000);
     private long tick = 0;
 
     // Format filename based on current date
     private Calendar calendar;
     private SimpleDateFormat dateFormat;
-    private static String fileName = null;
+    private static String filePath = null;
+
+    private double[] rawAudio = null;
+    private DoubleFFT_1D fft;
+    private double MAGNITUDE_THRESHOLD = 0.4;
 
     private void startRecording() {
         visualizerAnalog.clearValues();
@@ -209,21 +330,21 @@ public class MainActivity extends AppCompatActivity implements OnChartValueSelec
 
         // Record to the external cache directory for visibility
         dateFormat = new SimpleDateFormat("yyyyMMdd_HHmmss");
-        fileName = getExternalFilesDir(null).getAbsolutePath() + "/record_" + dateFormat.format(calendar.getTime()) + ".pcm";
+        filePath = getExternalFilesDir(null).getAbsolutePath() + "/record_" + dateFormat.format(calendar.getTime());
 
+        // Initialize recorder
         recorder = new MediaRecorder();
         recorder.setAudioSource(MediaRecorder.AudioSource.MIC);
         recorder.setOutputFormat(MediaRecorder.OutputFormat.AAC_ADTS);
         recorder.setAudioEncoder(MediaRecorder.AudioEncoder.AAC);
-        recorder.setAudioSamplingRate(SAMPLING_RATE);
-        recorder.setAudioEncodingBitRate(ENCODING_BITRATE);
-        recorder.setOutputFile(fileName);
+        recorder.setAudioSamplingRate(samplingRate);
+        recorder.setOutputFile(filePath + ".aac");
 
         try {
             recorder.prepare();
             recorder.start();
-        } catch (IOException ioe) {
-            Log.e(LOG_TAG, "prepare() failed");
+        } catch (IOException e) {
+            e.printStackTrace();
         }
 
         recordingTimer = new Timer();
@@ -235,66 +356,80 @@ public class MainActivity extends AppCompatActivity implements OnChartValueSelec
                     addEntry(visualizerAnalog, new Entry((float) tick / 1000, recorder.getMaxAmplitude()));
                     tick += PERIOD;
                 } catch (Exception e) {
-                    Log.e(LOG_TAG, "Error at getMaxAmplitude");
+                    e.printStackTrace();
                 }
             }
         }, 0, PERIOD);
     }
-
-
-    private double[] rawAudio;
-    private DoubleFFT_1D fft;
-
     private void stopRecording() {
+        isRecording = false;
+
         recorder.stop();
         recorder.release();
         recordingTimer.cancel();
         recorder = null;
         Toast.makeText(getApplicationContext(), "Recording session finished", Toast.LENGTH_LONG).show();
 
-        File audioFile = new File(fileName);
-        rawAudio = SoundDataUtils.load16BitPCMRawDataFileAsDoubleArray(audioFile);
-
-        fft = new DoubleFFT_1D(rawAudio.length);
-        Thread fftThread = new Thread(new Runnable() {
+        new Thread(new Runnable() {
             @Override
             public void run() {
-                fft.realForward(rawAudio);
+                SoundDataUtils.ConvertAACToPCM(filePath);
             }
         });
 
-        float frequencyResolution = SAMPLING_RATE / (float)rawAudio.length;
-        int totalSamples = (int)(((float)tick / 1000) * SAMPLING_RATE);
-        Log.i(LOG_TAG, Integer.toString(rawAudio.length));
-        if (rawAudio.length % 2 == 0) {
-            addEntry(visualizerDigital, new Entry(0, (float)rawAudio[0]));
-            for (int k = 1; k < rawAudio.length / 2; k++) {
-                double real = rawAudio[2*k];
-                double imaginary = rawAudio[2*k + 1];
-                addEntry(visualizerDigital, new Entry(k * frequencyResolution, (float)Math.sqrt(Math.pow(real, 2) + Math.pow(imaginary, 2))));
-            }
-            addEntry(visualizerDigital, new Entry(((float)rawAudio.length / 2) * frequencyResolution, (float)rawAudio[1]));
-        } else {
-            addEntry(visualizerDigital, new Entry(0, (float) rawAudio[0]));
-            for (int k = 1; k < (rawAudio.length - 1) / 2; k++) {
-                double real = rawAudio[2*k];
-                double imaginary = rawAudio[2*k + 1];
-                addEntry(visualizerDigital, new Entry(k * frequencyResolution, (float)Math.sqrt(Math.pow(real, 2) + Math.pow(imaginary, 2))));
-            }
-            addEntry(visualizerDigital, new Entry(((float)(rawAudio.length - 1) / 2) * frequencyResolution, (float)rawAudio[1]));
-        }
-
-        Toast.makeText(getApplicationContext(), "Transform finished", Toast.LENGTH_LONG).show();
+//        File audioFile = new File(filePath + ".pcm");
+//        rawAudio = SoundDataUtils.load16BitPCMRawDataFileAsDoubleArray(audioFile);
+//
+//        Log.i(LOG_TAG, Integer.toString(rawAudio.length));
+//
+//        new Thread(new Runnable() {
+//            @Override
+//            public void run() {
+//                fft = new DoubleFFT_1D(rawAudio.length);
+//                fft.realForward(rawAudio);
+//            }
+//        });
+//
+//        drawVisualizerFFT();
     }
 
 
-    @Override
-    public void onValueSelected(Entry e, Highlight h) {
-        Log.i("Entry selected", e.toString());
-    }
+    // Text input dialog
+    private void showTextInputDialog(final int title) {
+        final AlertDialog.Builder builder = new AlertDialog.Builder(this);
 
-    @Override
-    public void onNothingSelected() {
-        Log.i("Nothing selected", "Nothing selected.");
+        TextView dialogTitle = new TextView(this);
+        dialogTitle.setText("Set frequency");
+        dialogTitle.setPadding(20, 20, 20, 20);
+        dialogTitle.setTextSize(20F);
+        dialogTitle.setTextColor(ContextCompat.getColor(getApplicationContext(), R.color.colorPrimary));
+        builder.setCustomTitle(dialogTitle);
+
+        final EditText input = new EditText(this);
+        input.setInputType(InputType.TYPE_CLASS_NUMBER);
+        input.setPadding(20, 20, 20, 20);
+        builder.setView(input);
+
+        builder.setPositiveButton(android.R.string.ok, new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialog, int which) {
+                if (title == R.string.toolbar_menu_setMinFreq) {
+                    minFreq = Integer.parseInt(input.getText().toString());
+                    visualizerDigital.getXAxis().setAxisMinimum(minFreq);
+                } else {
+                    maxFreq = Integer.parseInt(input.getText().toString());
+                    samplingRate = maxFreq / 2;
+                    visualizerDigital.getXAxis().setAxisMaximum(maxFreq);
+                }
+            }
+        });
+        builder.setNegativeButton(android.R.string.cancel, new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialog, int which) {
+                dialog.cancel();
+            }
+        });
+
+        builder.show();
     }
 }

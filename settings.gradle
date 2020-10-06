@@ -1,3 +1,4 @@
+include ':jaad-0.8.4'
 include ':jfftpack'
 include ':app'
 rootProject.name = "MITECH Voice Inspection"

@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/player_sheet"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="@color/colorPrimaryLight"
+    app:layout_behavior="com.google.android.material.bottomsheet.BottomSheetBehavior"
+    app:behavior_peekHeight="@dimen/sheet_peek_height"
+    app:behavior_hideable="true">
+
+    <LinearLayout
+        android:id="@+id/player_header"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:background="@color/colorPrimaryLight"
+        android:weightSum="10"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent">
+
+        <ImageView
+            android:id="@+id/player_icon"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_weight="4"
+            android:padding="@dimen/sheet_padding"
+            app:srcCompat="@drawable/ic_media_track" />
+
+        <TextView
+            android:id="@+id/player_header_title"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_weight="3"
+            android:padding="@dimen/sheet_padding"
+            android:text="@string/player_title"
+            android:textSize="@dimen/sheet_text" />
+
+        <TextView
+            android:id="@+id/player_header_state"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_weight="3"
+            android:padding="@dimen/sheet_padding"
+            android:text="@string/player_state_stop"
+            android:textAlignment="textEnd"
+            android:textSize="@dimen/sheet_text" />
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/player_filename"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:text="@string/player_filename_placeholder"
+        android:textSize="@dimen/sheet_text"
+        android:textAlignment="center"
+        android:layout_marginTop="32dp"
+        android:layout_marginStart="32dp"
+        android:layout_marginEnd="32dp"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/player_header" />
+
+    <ImageButton
+        android:id="@+id/player_btn_play"
+        android:background="@color/colorPrimaryLight"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:padding="@dimen/sheet_padding"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/player_filename"
+        app:srcCompat="@drawable/ic_btn_record_play" />
+
+    <ImageButton
+        android:id="@+id/player_btn_previous"
+        android:background="@color/colorPrimaryLight"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:padding="@dimen/sheet_padding"
+        app:layout_constraintBottom_toBottomOf="@+id/player_btn_play"
+        app:layout_constraintEnd_toStartOf="@+id/player_btn_play"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="@+id/player_btn_play"
+        app:srcCompat="@drawable/ic_btn_record_previous" />
+
+    <ImageButton
+        android:id="@+id/player_btn_next"
+        android:background="@color/colorPrimaryLight"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:padding="@dimen/sheet_padding"
+        app:layout_constraintBottom_toBottomOf="@+id/player_btn_play"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toEndOf="@+id/player_btn_play"
+        app:layout_constraintTop_toTopOf="@+id/player_btn_play"
+        app:srcCompat="@drawable/ic_btn_record_next" />
+
+    <SeekBar
+        android:id="@+id/player_seekbar"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_margin="32dp"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/player_btn_play" />
+
+</androidx.constraintlayout.widget.ConstraintLayout>

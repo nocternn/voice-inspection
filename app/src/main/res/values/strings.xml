@@ -2,6 +2,10 @@
     <string name="app_name">MITECH Voice Inspection</string>
     <string name="placeholder">Placeholder</string>
 
+    <!-- Toolbar menu -->
+    <string name="toolbar_menu_setMinFreq">Set minimum frequency</string>
+    <string name="toolbar_menu_setMaxFreq">Set maximum frequency</string>
+
     <!-- Visualizers -->
     <string name="visualizer_analog">Amplitude vs Time(s)</string>
     <string name="visualizer_digital">Amplitude vs Frequency(Hz)</string>
@@ -18,4 +22,6 @@
     <!-- Media Player -->
     <string name="player_title">Media Player</string>
     <string name="player_state_stop">Not Playing</string>
+    <string name="player_state_play">Playing</string>
+    <string name="player_filename_placeholder">File Name</string>
 </resources>

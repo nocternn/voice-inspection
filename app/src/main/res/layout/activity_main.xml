@@ -1,121 +1,61 @@
 <?xml version="1.0" encoding="utf-8"?>
-<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.coordinatorlayout.widget.CoordinatorLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/app_root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:paddingHorizontal="@dimen/margin_widgets"
     tools:context=".MainActivity">
-
-<!--    <com.visualizer.amplitude.AudioRecordView-->
-<!--        android:id="@+id/visualizer_analog"-->
-<!--        android:layout_width="match_parent"-->
-<!--        android:layout_height="@dimen/visualizer_container_height"-->
-<!--        android:layout_marginTop="@dimen/margin_widgets"-->
-<!--        android:background="@color/colorPrimaryLight"-->
-<!--        app:chunkRoundedCorners="true"-->
-<!--        app:chunkSoftTransition="true"-->
-<!--        app:chunkColor="@color/colorVisualizerAnalogLight"-->
-<!--        app:chunkSpace="@dimen/visualizer_chunk_space"-->
-<!--        app:chunkWidth="@dimen/visualizer_chunk_width"-->
-<!--        app:chunkMaxHeight="@dimen/visualizer_visual_max_height"-->
-<!--        app:chunkMinHeight="@dimen/visualizer_visual_min_height"/>-->
-
-<!--    <com.visualizer.amplitude.AudioRecordView-->
-<!--        android:id="@+id/visualizer_digital"-->
-<!--        android:layout_width="match_parent"-->
-<!--        android:layout_height="@dimen/visualizer_container_height"-->
-<!--        android:layout_marginTop="@dimen/margin_widgets"-->
-<!--        android:layout_below="@+id/visualizer_analog"-->
-<!--        android:background="@color/colorPrimaryLight"-->
-<!--        app:chunkRoundedCorners="true"-->
-<!--        app:chunkSoftTransition="true"-->
-<!--        app:chunkColor="@color/colorVisualizerDigital"-->
-<!--        app:chunkSpace="@dimen/visualizer_chunk_space"-->
-<!--        app:chunkWidth="@dimen/visualizer_chunk_width"-->
-<!--        app:chunkMaxHeight="@dimen/visualizer_visual_max_height"-->
-<!--        app:chunkMinHeight="@dimen/visualizer_visual_min_height"/>-->
-
-    <com.github.mikephil.charting.charts.LineChart
-        android:id="@+id/visualizer_analog"
+    <RelativeLayout
         android:layout_width="match_parent"
-        android:layout_height="@dimen/visualizer_container_height"
-        android:layout_marginTop="@dimen/margin_widgets"/>
+        android:layout_height="wrap_content">
+        <com.google.android.material.appbar.MaterialToolbar
+            android:id="@+id/toolbar"
+            android:layout_width="match_parent"
+            android:layout_height="?attr/actionBarSize"
+            android:background="@color/colorPrimary"
+            app:title="@string/app_name"
+            app:titleTextColor="@color/textColor"
+            style="@style/ThemeOverlay.AppCompat.Dark.ActionBar"/>
 
-    <com.github.mikephil.charting.charts.LineChart
-        android:id="@+id/visualizer_digital"
-        android:layout_width="match_parent"
-        android:layout_height="@dimen/visualizer_container_height"
-        android:layout_marginTop="@dimen/margin_widgets"
-        android:layout_below="@+id/visualizer_analog"/>
-
-    <com.google.android.material.floatingactionbutton.FloatingActionButton
-        android:id="@+id/btn_record"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="@dimen/margin_widgets"
-        android:layout_centerHorizontal="true"
-        android:layout_below="@+id/visualizer_digital"
-        android:elevation="@dimen/btn_elevation"
-        app:srcCompat="@drawable/ic_btn_record_start"
-        app:backgroundTint="@color/colorSecondary"/>
-
-    <GridLayout
-        android:id="@+id/functions"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:columnCount="2"
-        android:layout_below="@id/btn_record"
-        android:layout_centerHorizontal="true">
-        <Button
-            android:id="@+id/btn_add"
-            android:layout_width="@dimen/btn_width"
-            android:layout_height="@dimen/btn_height"
+        <com.github.mikephil.charting.charts.LineChart
+            android:id="@+id/visualizer_analog"
+            android:layout_width="match_parent"
+            android:layout_height="@dimen/visualizer_container_height"
             android:layout_marginTop="@dimen/margin_widgets"
-            android:layout_marginEnd="@dimen/margin_widgets"
-            android:text="@string/btn_add"
-            style="@style/OutlinedButton" />
+            android:layout_marginHorizontal="@dimen/margin_widgets"
+            android:layout_below="@id/toolbar"/>
 
-        <LinearLayout
-            android:layout_gravity="center">
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/txt_sample_type1"
-                android:textStyle="bold"
-                android:textColor="@color/colorPrimaryDark" />
-
-            <Switch
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginHorizontal="@dimen/margin_widgets"
-                android:track="@drawable/switch_sample_type_track"
-                android:thumb="@drawable/switch_sample_type_thumb"
-                />
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/txt_sample_type2"
-                android:textStyle="bold"
-                android:textColor="@color/colorPrimaryDark"/>
-        </LinearLayout>
-
-        <Button
-            android:id="@+id/btn_train"
-            android:layout_width="@dimen/btn_width"
-            android:layout_height="@dimen/btn_height"
+        <com.github.mikephil.charting.charts.LineChart
+            android:id="@+id/visualizer_digital"
+            android:layout_width="match_parent"
+            android:layout_height="@dimen/visualizer_container_height"
             android:layout_marginTop="@dimen/margin_widgets"
-            android:layout_marginEnd="@dimen/margin_widgets"
-            android:text="@string/btn_train"
-            style="@style/OutlinedButton"/>
+            android:layout_marginHorizontal="@dimen/margin_widgets"
+            android:layout_below="@+id/visualizer_analog"/>
 
-        <Button
-            android:id="@+id/btn_predict"
-            android:layout_width="@dimen/btn_width"
-            android:layout_height="@dimen/btn_height"
+        <com.google.android.material.floatingactionbutton.FloatingActionButton
+            android:id="@+id/btn_record"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
             android:layout_marginTop="@dimen/margin_widgets"
-            android:text="@string/btn_predict" />
-    </GridLayout>
+            android:layout_marginHorizontal="@dimen/margin_widgets"
+            android:layout_centerHorizontal="true"
+            android:layout_below="@+id/visualizer_digital"
+            android:elevation="@dimen/btn_elevation"
+            app:srcCompat="@drawable/ic_btn_record_start"
+            app:backgroundTint="@color/colorSecondary"/>
 
-</RelativeLayout>
+        <include layout="@layout/main_functions"
+            android:id="@+id/functions"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_below="@id/btn_record"
+            android:layout_marginTop="@dimen/margin_widgets"
+            android:layout_marginHorizontal="@dimen/margin_widgets"
+            android:layout_centerHorizontal="true"/>
+    </RelativeLayout>
+
+    <include layout="@layout/media_player"/>
+</androidx.coordinatorlayout.widget.CoordinatorLayout>

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+    <item
+        android:title="@string/toolbar_menu_setMinFreq"
+        android:id="@+id/toolber_menu_setMinFreq"/>
+    <item
+        android:title="@string/toolbar_menu_setMaxFreq"
+        android:id="@+id/toolber_menu_setMaxFreq"/>
+</menu>

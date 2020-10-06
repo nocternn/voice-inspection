@@ -1,0 +1,60 @@
+<GridLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:paddingHorizontal="@dimen/margin_widgets"
+    tools:context=".MainActivity"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:columnCount="2"
+    android:layout_centerHorizontal="true">
+    <Button
+        android:id="@+id/btn_add"
+        android:layout_width="@dimen/btn_width"
+        android:layout_height="@dimen/btn_height"
+        android:layout_marginTop="@dimen/margin_widgets"
+        android:layout_marginEnd="@dimen/margin_widgets"
+        android:text="@string/btn_add"
+        style="@style/OutlinedButton" />
+
+    <LinearLayout
+        android:layout_gravity="center">
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/txt_sample_type1"
+            android:textStyle="bold"
+            android:textColor="@color/colorPrimaryDark" />
+
+        <Switch
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginHorizontal="@dimen/margin_widgets"
+            android:track="@drawable/switch_sample_type_track"
+            android:thumb="@drawable/switch_sample_type_thumb"
+            />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/txt_sample_type2"
+            android:textStyle="bold"
+            android:textColor="@color/colorPrimaryDark"/>
+    </LinearLayout>
+
+    <Button
+        android:id="@+id/btn_train"
+        android:layout_width="@dimen/btn_width"
+        android:layout_height="@dimen/btn_height"
+        android:layout_marginTop="@dimen/margin_widgets"
+        android:layout_marginEnd="@dimen/margin_widgets"
+        android:text="@string/btn_train"
+        style="@style/OutlinedButton"/>
+
+    <Button
+        android:id="@+id/btn_predict"
+        android:layout_width="@dimen/btn_width"
+        android:layout_height="@dimen/btn_height"
+        android:layout_marginTop="@dimen/margin_widgets"
+        android:text="@string/btn_predict" />
+</GridLayout>
