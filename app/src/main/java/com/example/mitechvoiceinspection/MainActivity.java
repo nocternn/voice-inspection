@@ -54,6 +54,8 @@ import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.ObjectOutputStream;
+import java.io.OutputStream;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.text.DateFormat;
@@ -260,35 +262,6 @@ public class MainActivity extends AppCompatActivity implements OnChartValueSelec
         return set;
     }
 
-    private void drawVisualizerFFT(double[] fftCoefficients) {
-        float frequencyResolution = RECORDER_SAMPLERATE / (float)fftCoefficients.length;
-        if (fftCoefficients.length % 2 == 0) {
-//            addEntry(visualizerDigital, new Entry(0, (float)fftCoefficients[0]));
-            for (int k = 1; k < fftCoefficients.length / 2; k++) {
-                double frequency = k * frequencyResolution;
-
-                double real = fftCoefficients[2*k];
-                double imaginary = fftCoefficients[2*k + 1];
-                double magnitude = Math.sqrt(Math.pow(real, 2) + Math.pow(imaginary, 2));
-
-                addEntry(visualizerDigital, new Entry((float) frequency, (float) magnitude));
-            }
-//            addEntry(visualizerDigital, new Entry(((float)fftCoefficients.length / 2) * frequencyResolution, (float)fftCoefficients[1]));
-        } else {
-//            addEntry(visualizerDigital, new Entry(0, (float)fftCoefficients[0]));
-            for (int k = 1; k < (fftCoefficients.length - 1) / 2; k++) {
-                double frequency = k * frequencyResolution;
-
-                double real = fftCoefficients[2*k];
-                double imaginary = fftCoefficients[2*k + 1];
-                double magnitude = Math.sqrt(Math.pow(real, 2) + Math.pow(imaginary, 2));
-
-                addEntry(visualizerDigital, new Entry((float)frequency, (float)magnitude));
-            }
-//            addEntry(visualizerDigital, new Entry((((float)fftCoefficients.length - 1) / 2) * frequencyResolution, (float)fftCoefficients[1]));
-        }
-    }
-
     @Override
     public void onValueSelected(Entry e, Highlight h) {
         Log.i("Entry selected", e.toString());
@@ -317,7 +290,7 @@ public class MainActivity extends AppCompatActivity implements OnChartValueSelec
     private float tick = 0;
     private static final float VISUALIZER_PERIOD = (float)0.005;
 
-    private double[] audio;
+    private double[] freqSpectrum;
 
     // Format filename based on current date
     private Calendar calendar;
@@ -330,7 +303,7 @@ public class MainActivity extends AppCompatActivity implements OnChartValueSelec
 
         // Record to the external cache directory for visibility
         dateFormat = new SimpleDateFormat("yyyyMMdd_HHmmss");
-        filePath = getExternalFilesDir(null).getAbsolutePath() + "/record_" + dateFormat.format(calendar.getTime()) + ".pcm";
+        filePath = getExternalFilesDir(null).getAbsolutePath() + "/record_" + dateFormat.format(calendar.getTime());
 
         recorder = new AudioRecord(MediaRecorder.AudioSource.MIC,
                 RECORDER_SAMPLERATE, RECORDER_CHANNELS,
@@ -340,7 +313,7 @@ public class MainActivity extends AppCompatActivity implements OnChartValueSelec
         isRecording = true;
         recordingThread = new Thread(new Runnable() {
             public void run() {
-                writeAudioDataToFile(filePath);
+                writeAudioDataToFile();
             }
         }, "AudioRecorder Thread");
         recordingThread.start();
@@ -354,8 +327,10 @@ public class MainActivity extends AppCompatActivity implements OnChartValueSelec
             recorder = null;
             recordingThread = null;
 
-            FFT();
-//            drawVisualizerFFT(audio);
+            freqSpectrum = FFT();
+            // draw the frequency spectrum
+            for (int i = 0; i < freqSpectrum.length; i++)
+                addEntry(visualizerDigital, new Entry(i, (float)freqSpectrum[i]));
         }
     }
     //convert short to byte
@@ -382,12 +357,12 @@ public class MainActivity extends AppCompatActivity implements OnChartValueSelec
         return shorts;
     }
     // Write the output audio in byte
-    private void writeAudioDataToFile(String path) {
+    private void writeAudioDataToFile() {
         short[] sData = new short[BufferElements2Rec];
 
         FileOutputStream os = null;
         try {
-            os = new FileOutputStream(path);
+            os = new FileOutputStream(filePath + ".pcm");
         } catch (FileNotFoundException e) {
             e.printStackTrace();
         }
@@ -417,51 +392,47 @@ public class MainActivity extends AppCompatActivity implements OnChartValueSelec
             e.printStackTrace();
         }
     }
-    private double[] load16BitPCMRawDataFileAsDoubleArray(File file) {
-        double[] output = null;
-        InputStream in;
-        if (file.isFile()) {
-            long size = file.length();
-            try {
-                in = new FileInputStream(file);
-                output = readStreamAsDoubleArray(in, size);
-            } catch (Exception e) {
-            }
-        } else {
-            Log.e(LOG_TAG, "PCM file not found");
-        }
-        return output;
-    }
-    private double[] readStreamAsDoubleArray(InputStream in, long size) throws IOException {
-        int bufferSize = (int) (size / 2);
-        double[] result = new double[bufferSize];
-        DataInputStream is = new DataInputStream(in);
-        for (int i = 0; i < bufferSize; i++) {
-            result[i] = is.readShort() / 32768.0;
-        }
-        return result;
-    }
-
-    private void FFT() {
+    private double[] FFT() {
         DoubleFFT_1D fft = new DoubleFFT_1D(BufferElements2Rec);
+        double[] spectrum = new double[RECORDER_SAMPLERATE / 2];
 
         try {
-            FileInputStream is = new FileInputStream(new File(filePath));
-            byte[] bData = new byte[BufferElements2Rec * BytesPerElement];
+            FileInputStream is = new FileInputStream(new File(filePath + ".pcm"));
 
+            byte[] bData = new byte[BufferElements2Rec * BytesPerElement];
             tick = 0;
             while (is.read(bData, 0 , bData.length) != -1) {
                 short[] sData = byte2short(bData);
-                
-                for (int i = 143; i < BufferElements2Rec; i += 220) {
-                    addEntry(visualizerDigital, new Entry(tick, (float) sData[i]));
-                    tick += VISUALIZER_PERIOD;
+
+                double[] dData = new double[sData.length];
+                for (int i = 0; i < sData.length; i++) {
+                    dData[i] = sData[i] / 32768.0;
                 }
+                fft.realForward(dData);
+
+                float frequencyResolution = RECORDER_SAMPLERATE / (float)dData.length;
+                double maxFrequency = 0, maxAmplitude = 0;
+                for (int k = 1; k < dData.length / 2; k++) {
+                    double frequency = k * frequencyResolution;
+
+                    double real = dData[2*k];
+                    double imaginary = dData[2*k + 1];
+                    double magnitude = Math.sqrt(Math.pow(real, 2) + Math.pow(imaginary, 2));
+
+                    if (magnitude > maxAmplitude) {
+                        maxFrequency = frequency;
+                        maxAmplitude = magnitude;
+                    }
+                }
+                spectrum[(int)maxFrequency] = maxAmplitude;
             }
         } catch (FileNotFoundException e) {
             Log.e(LOG_TAG, "PCM file not found");
         } catch (Exception e) {}
+
+        return spectrum;
     }
+
 
     // Play audio
     private void playAudio() {
@@ -477,6 +448,7 @@ public class MainActivity extends AppCompatActivity implements OnChartValueSelec
                 AudioTrack.MODE_STREAM );
         audio.play();
     }
+
 
 
     // Text input dialog
