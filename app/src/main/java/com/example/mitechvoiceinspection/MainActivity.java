@@ -56,6 +56,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.ObjectOutputStream;
 import java.io.OutputStream;
+import java.nio.Buffer;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.text.DateFormat;
@@ -95,12 +96,12 @@ public class MainActivity extends AppCompatActivity implements OnChartValueSelec
 
         visualizerAnalog = findViewById(R.id.visualizer_analog);
         initializeVisualizer(visualizerAnalog, "analog");
-
         visualizerDigital = findViewById(R.id.visualizer_digital);
         initializeVisualizer(visualizerDigital, "digital");
 
         calendar = Calendar.getInstance();
 
+        // Toggle recording state
         final FloatingActionButton btnRecord = findViewById(R.id.btn_record);
         btnRecord.setOnClickListener(new View.OnClickListener(){
             @Override
@@ -119,11 +120,9 @@ public class MainActivity extends AppCompatActivity implements OnChartValueSelec
             }
         });
 
-
         // Media player
         playerSheet = findViewById(R.id.player_sheet);
         playerSheetBehavior = BottomSheetBehavior.from(playerSheet);
-
         playerSheetBehavior.addBottomSheetCallback(new BottomSheetBehavior.BottomSheetCallback() {
             @Override
             public void onStateChanged(@NonNull View bottomSheet, int newState) {
@@ -145,6 +144,10 @@ public class MainActivity extends AppCompatActivity implements OnChartValueSelec
             @Override
             public void onSlide(@NonNull View bottomSheet, float slideOffset) {}
         });
+
+        // Add Apache POI API
+        System.setProperty("org.apache.poi.javax.xml.stream.XMLOutputFactory", "com.fasterxml.aalto.stax.OuputFactoryImpl");
+        System.setProperty("org.apache.poi.javax.xml.stream.XMLEventFactory", "com.fasterxml.aalto.stax.EventFactoryImpl");
     }
 
     @Override
@@ -155,7 +158,7 @@ public class MainActivity extends AppCompatActivity implements OnChartValueSelec
 
     @Override
     public boolean onOptionsItemSelected(@NonNull MenuItem item) {
-        showTextInputDialog(item.getItemId());
+        showTextInputDialog();
         return true;
     }
 
@@ -163,7 +166,7 @@ public class MainActivity extends AppCompatActivity implements OnChartValueSelec
     // Visualizers
     private LineChart visualizerAnalog;
     private LineChart visualizerDigital;
-    private int minFreq = 20, maxFreq = 20000;
+    private int maxFreq = 250;
 
     private void initializeVisualizer(LineChart mChart, String chartType) {
         mChart.setOnChartValueSelectedListener(this);
@@ -284,18 +287,26 @@ public class MainActivity extends AppCompatActivity implements OnChartValueSelec
     private AudioRecord recorder = null;
     private Thread recordingThread = null;
 
-    private int BufferElements2Rec = 1024; // want to play 2048 (2K) since 2 bytes we use only 1024
-    private int BytesPerElement = 2; // 2 bytes in 16bit format
+    private int NUM_BUFFER_ELEMENTS = 1024; // want to play 2048 (2K) since 2 bytes we use only 1024
+    private int BYTES_PER_ELEMENT = 2; // 2 bytes in 16bit format
+
+    private double READ_PCM_PERIOD = 2.0 / maxFreq;
+    private int READ_PCM_SAMPLES = (int)Math.round(RECORDER_SAMPLERATE * READ_PCM_PERIOD);
+    private final float FREQUENCY_RES = (float)RECORDER_SAMPLERATE / READ_PCM_SAMPLES;
 
     private float tick = 0;
     private static final float VISUALIZER_PERIOD = (float)0.005;
 
-    private double[] freqSpectrum;
+    private double[] fullSpectrum = new double[RECORDER_SAMPLERATE / 2];
+    private double[] shortSpectrum = new double[READ_PCM_SAMPLES / 2];
+    private double readCount = 0;
 
     // Format filename based on current date
     private Calendar calendar;
     private SimpleDateFormat dateFormat;
     private static String filePath = null;
+    private static final String EXTENSION_PCM = ".pcm";
+    private static final String EXTENSION_CSV = ".csv";
 
     private void startRecording() {
         visualizerAnalog.clearValues();
@@ -307,7 +318,7 @@ public class MainActivity extends AppCompatActivity implements OnChartValueSelec
 
         recorder = new AudioRecord(MediaRecorder.AudioSource.MIC,
                 RECORDER_SAMPLERATE, RECORDER_CHANNELS,
-                RECORDER_AUDIO_ENCODING, BufferElements2Rec * BytesPerElement);
+                RECORDER_AUDIO_ENCODING, NUM_BUFFER_ELEMENTS * BYTES_PER_ELEMENT);
 
         recorder.startRecording();
         isRecording = true;
@@ -327,10 +338,11 @@ public class MainActivity extends AppCompatActivity implements OnChartValueSelec
             recorder = null;
             recordingThread = null;
 
-            freqSpectrum = FFT();
+            FFT();
             // draw the frequency spectrum
-            for (int i = 0; i < freqSpectrum.length; i++)
-                addEntry(visualizerDigital, new Entry(i, (float)freqSpectrum[i]));
+            for (int i = 0; i < fullSpectrum.length; i++) {
+                addEntry(visualizerDigital, new Entry(i, (float) fullSpectrum[i]));
+            }
         }
     }
     //convert short to byte
@@ -358,11 +370,11 @@ public class MainActivity extends AppCompatActivity implements OnChartValueSelec
     }
     // Write the output audio in byte
     private void writeAudioDataToFile() {
-        short[] sData = new short[BufferElements2Rec];
+        short[] sData = new short[READ_PCM_SAMPLES];
 
         FileOutputStream os = null;
         try {
-            os = new FileOutputStream(filePath + ".pcm");
+            os = new FileOutputStream(filePath + EXTENSION_PCM);
         } catch (FileNotFoundException e) {
             e.printStackTrace();
         }
@@ -370,9 +382,10 @@ public class MainActivity extends AppCompatActivity implements OnChartValueSelec
 
         while (isRecording) {
             // gets the voice output from microphone to byte format
-            recorder.read(sData, 0, BufferElements2Rec);
+            recorder.read(sData, 0, READ_PCM_SAMPLES);
 
-            for (int i = 143; i < BufferElements2Rec; i += 220) {
+            // Draw on analog visualizer
+            for (int i = 40; i < READ_PCM_SAMPLES; i += 220) {
                 addEntry(visualizerAnalog, new Entry(tick, sData[i]));
                 tick += VISUALIZER_PERIOD;
             }
@@ -381,7 +394,7 @@ public class MainActivity extends AppCompatActivity implements OnChartValueSelec
                 // writes the data to file from buffer
                 // stores the voice buffer
                 byte[] bData = short2byte(sData);
-                os.write(bData, 0, BufferElements2Rec * BytesPerElement);
+                os.write(bData, 0, READ_PCM_SAMPLES * BYTES_PER_ELEMENT);
             } catch (IOException e) {
                 e.printStackTrace();
             }
@@ -392,16 +405,17 @@ public class MainActivity extends AppCompatActivity implements OnChartValueSelec
             e.printStackTrace();
         }
     }
-    private double[] FFT() {
-        DoubleFFT_1D fft = new DoubleFFT_1D(BufferElements2Rec);
-        double[] spectrum = new double[RECORDER_SAMPLERATE / 2];
+    private void FFT() {
+        DoubleFFT_1D fft = new DoubleFFT_1D(READ_PCM_SAMPLES);
 
         try {
-            FileInputStream is = new FileInputStream(new File(filePath + ".pcm"));
+            FileInputStream is = new FileInputStream(new File(filePath + EXTENSION_PCM));
+//            ObjectOutputStream os = new ObjectOutputStream(new FileOutputStream(filePath + EXTENSION_CSV));
 
-            byte[] bData = new byte[BufferElements2Rec * BytesPerElement];
+            byte[] bData = new byte[READ_PCM_SAMPLES * BYTES_PER_ELEMENT];
             tick = 0;
             while (is.read(bData, 0 , bData.length) != -1) {
+                readCount++;
                 short[] sData = byte2short(bData);
 
                 double[] dData = new double[sData.length];
@@ -410,27 +424,45 @@ public class MainActivity extends AppCompatActivity implements OnChartValueSelec
                 }
                 fft.realForward(dData);
 
-                float frequencyResolution = RECORDER_SAMPLERATE / (float)dData.length;
-                double maxFrequency = 0, maxAmplitude = 0;
-                for (int k = 1; k < dData.length / 2; k++) {
-                    double frequency = k * frequencyResolution;
+//                String dataChunk = "";
+                if (dData.length % 2 == 0) {
+                    for (int k = 1; k < dData.length / 2; k++) {
+                        double frequency = k * FREQUENCY_RES;
 
-                    double real = dData[2*k];
-                    double imaginary = dData[2*k + 1];
-                    double magnitude = Math.sqrt(Math.pow(real, 2) + Math.pow(imaginary, 2));
+                        double real = dData[2 * k];
+                        double imaginary = dData[2 * k + 1];
+                        double magnitude = Math.sqrt(Math.pow(real, 2) + Math.pow(imaginary, 2));
 
-                    if (magnitude > maxAmplitude) {
-                        maxFrequency = frequency;
-                        maxAmplitude = magnitude;
+                        fullSpectrum[(int)frequency] += magnitude;
+                        shortSpectrum[k] += magnitude;
+
+//                        dataChunk = dataChunk.concat(magnitude + ",");
+                    }
+                } else {
+                    for (int k = 1; k < (dData.length - 1) / 2; k++) {
+                        double frequency = k * FREQUENCY_RES;
+
+                        double real = dData[2 * k];
+                        double imaginary = dData[2 * k + 1];
+                        double magnitude = Math.sqrt(Math.pow(real, 2) + Math.pow(imaginary, 2));
+
+                        fullSpectrum[(int)frequency] += magnitude;
+                        shortSpectrum[k] += magnitude;
+
+//                        dataChunk = dataChunk.concat(magnitude + ",");
                     }
                 }
-                spectrum[(int)maxFrequency] = maxAmplitude;
+//                dataChunk = dataChunk.concat("\n");
+//                os.writeBytes(dataChunk);
+            }
+
+            for (int i = 0; i < shortSpectrum.length; i++) {
+                fullSpectrum[(int)(i * FREQUENCY_RES)] /= readCount;
+                shortSpectrum[i] /= readCount;
             }
         } catch (FileNotFoundException e) {
             Log.e(LOG_TAG, "PCM file not found");
         } catch (Exception e) {}
-
-        return spectrum;
     }
 
 
@@ -450,9 +482,8 @@ public class MainActivity extends AppCompatActivity implements OnChartValueSelec
     }
 
 
-
     // Text input dialog
-    private void showTextInputDialog(final int title) {
+    private void showTextInputDialog() {
         final AlertDialog.Builder builder = new AlertDialog.Builder(this);
 
         TextView dialogTitle = new TextView(this);
@@ -470,13 +501,7 @@ public class MainActivity extends AppCompatActivity implements OnChartValueSelec
         builder.setPositiveButton(android.R.string.ok, new DialogInterface.OnClickListener() {
             @Override
             public void onClick(DialogInterface dialog, int which) {
-                if (title == R.string.toolbar_menu_setMinFreq) {
-                    minFreq = Integer.parseInt(input.getText().toString());
-                    visualizerDigital.getXAxis().setAxisMinimum(minFreq);
-                } else {
-                    maxFreq = Integer.parseInt(input.getText().toString());
-                    visualizerDigital.getXAxis().setAxisMaximum(maxFreq);
-                }
+                maxFreq = Integer.parseInt(input.getText().toString());
             }
         });
         builder.setNegativeButton(android.R.string.cancel, new DialogInterface.OnClickListener() {
