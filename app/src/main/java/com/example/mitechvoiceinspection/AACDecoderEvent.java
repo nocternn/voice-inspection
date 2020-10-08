@@ -1,55 +1,49 @@
-
 package com.example.mitechvoiceinspection;
 
 import android.util.Log;
 
-import java.io.DataInputStream;
+import net.sourceforge.jaad.aac.AACException;
+import net.sourceforge.jaad.aac.Decoder;
+import net.sourceforge.jaad.aac.SampleBuffer;
+import net.sourceforge.jaad.adts.ADTSDemultiplexer;
+
+import java.io.EOFException;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
 
-import net.sourceforge.jaad.adts.ADTSDemultiplexer;
-import net.sourceforge.jaad.aac.*;
+public class AACDecoderEvent {
+    private static final String LOG_TAG = "AACDecoder";
+    private final String aacFilePath;
+    private final String pcmFilePath;
 
-class SoundDataUtils {
-    private static final String LOG_TAG = "SoundDataUtils";
-
-    public static double[] load16BitPCMRawDataFileAsDoubleArray(File file) {
-        InputStream in = null;
-        if (file.isFile()) {
-            long size = file.length();
-            try {
-                in = new FileInputStream(file);
-                return readStreamAsDoubleArray(in, size);
-            } catch (Exception e) {
-            }
-        }
-        return null;
+    public AACDecoderEvent(String path) {
+        this.aacFilePath = path + ".aac";
+        this.pcmFilePath = path + ".pcm";
     }
 
-    public static double[] readStreamAsDoubleArray(InputStream in, long size)
-            throws IOException {
-        int bufferSize = (int) (size / 2);
-        double[] result = new double[bufferSize];
-        DataInputStream is = new DataInputStream(in);
-        for (int i = 0; i < bufferSize; i++) {
-            result[i] = is.readShort() / 32768.0;
-        }
-        return result;
+
+    // Getters
+    public String getAACFilePath() {
+        return this.aacFilePath;
+    }
+    public String getPCMFilePath() {
+        return this.pcmFilePath;
     }
 
-    public static void ConvertAACToPCM(String path) {
+
+    public void ConvertAACToPCM(String inputPath, String outputPath) {
         try {
-            File aacAudioFile = new File(path + ".aac");
+            File aacAudioFile = new File(inputPath);
             FileInputStream inputStream = new FileInputStream(aacAudioFile);
-            FileOutputStream outputStream = new FileOutputStream(path + ".pcm");
+            FileOutputStream outputStream = new FileOutputStream(outputPath);
 
             ADTSDemultiplexer adts = new ADTSDemultiplexer(inputStream);
             byte[] decoderSpecificInfo = adts.getDecoderSpecificInfo();
 
+            int count = 0;
             byte[] frame, decodedFrame;
             while ((frame = adts.readNextFrame()) != null) {
                 decodedFrame = decodeFrame(frame, decoderSpecificInfo);
@@ -60,6 +54,8 @@ class SoundDataUtils {
             outputStream.close();
         } catch (FileNotFoundException e) {
             Log.e(LOG_TAG, "AAC/PCM file not found");
+        } catch (EOFException e) {
+            Log.e(LOG_TAG, "End of file");
         } catch (IOException e) {
             Log.e(LOG_TAG, "Could not create ADTS demultiplexer");
             e.printStackTrace();

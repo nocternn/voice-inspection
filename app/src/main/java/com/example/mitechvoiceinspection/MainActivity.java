@@ -6,28 +6,25 @@ import androidx.appcompat.widget.Toolbar;
 import androidx.constraintlayout.widget.ConstraintLayout;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
-import androidx.core.content.res.ResourcesCompat;
 
 import android.Manifest;
-import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.DialogInterface;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.media.AudioFormat;
+import android.media.AudioManager;
 import android.media.AudioRecord;
+import android.media.AudioTrack;
 import android.media.MediaRecorder;
+import android.os.AsyncTask;
 import android.os.Bundle;
 import android.text.InputType;
 import android.util.Log;
-import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
-import android.view.ViewGroup;
 import android.widget.EditText;
-import android.widget.ImageButton;
-import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -44,12 +41,22 @@ import com.github.mikephil.charting.listener.OnChartValueSelectedListener;
 import com.github.mikephil.charting.utils.ColorTemplate;
 import com.google.android.material.bottomsheet.BottomSheetBehavior;
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
-import com.visualizer.amplitude.AudioRecordView;
 
+import org.greenrobot.eventbus.EventBus;
+import org.greenrobot.eventbus.Subscribe;
+import org.greenrobot.eventbus.ThreadMode;
 import org.jtransforms.fft.DoubleFFT_1D;
 
+import java.io.DataInputStream;
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.Calendar;
 import java.util.Timer;
@@ -57,7 +64,7 @@ import java.util.TimerTask;
 
 
 public class MainActivity extends AppCompatActivity implements OnChartValueSelectedListener {
-    private static final String LOG_TAG = "AudioRecordTest";
+    private static final String LOG_TAG = "MITECH Voice Inspection";
 
 
     // Requesting permissions
@@ -72,7 +79,7 @@ public class MainActivity extends AppCompatActivity implements OnChartValueSelec
 
     private boolean isRecording = false;
     private Toolbar toolbar;
-//    // Media player
+    // Media player
     private ConstraintLayout playerSheet;
     private BottomSheetBehavior playerSheetBehavior;
 
@@ -106,7 +113,6 @@ public class MainActivity extends AppCompatActivity implements OnChartValueSelec
                         btnRecord.setImageResource(R.drawable.ic_btn_record_start);
                         stopRecording();
                     }
-                    isRecording = !isRecording;
                 }
             }
         });
@@ -155,7 +161,7 @@ public class MainActivity extends AppCompatActivity implements OnChartValueSelec
     // Visualizers
     private LineChart visualizerAnalog;
     private LineChart visualizerDigital;
-    private int minFreq = 0, maxFreq = 400;
+    private int minFreq = 20, maxFreq = 20000;
 
     private void initializeVisualizer(LineChart mChart, String chartType) {
         mChart.setOnChartValueSelectedListener(this);
@@ -191,10 +197,10 @@ public class MainActivity extends AppCompatActivity implements OnChartValueSelec
 
         XAxis axisX = mChart.getXAxis();
         axisX.setPosition(XAxis.XAxisPosition.BOTTOM);
-        if (!chartType.equals("analog")) {
-            axisX.setAxisMinimum(minFreq);
-            axisX.setAxisMaximum(maxFreq);
-        }
+//        if (!chartType.equals("analog")) {
+//            axisX.setAxisMinimum(minFreq);
+//            axisX.setAxisMaximum(maxFreq);
+//        }
         axisX.setAvoidFirstLastClipping(true);
         axisX.setTextColor(ContextCompat.getColor(getApplicationContext(), R.color.textColor));
         axisX.setEnabled(true);
@@ -254,42 +260,32 @@ public class MainActivity extends AppCompatActivity implements OnChartValueSelec
         return set;
     }
 
-    private void drawVisualizerFFT() {
-        double frequencyResolution = samplingRate / (double)rawAudio.length;
-        Log.i(LOG_TAG, Integer.toString(rawAudio.length));
-        if (rawAudio.length % 2 == 0) {
-//            addEntry(visualizerDigital, new Entry(0, (float)rawAudio[0]));
-            for (int k = 1; k < rawAudio.length / 2; k++) {
+    private void drawVisualizerFFT(double[] fftCoefficients) {
+        float frequencyResolution = RECORDER_SAMPLERATE / (float)fftCoefficients.length;
+        if (fftCoefficients.length % 2 == 0) {
+//            addEntry(visualizerDigital, new Entry(0, (float)fftCoefficients[0]));
+            for (int k = 1; k < fftCoefficients.length / 2; k++) {
                 double frequency = k * frequencyResolution;
 
-                double real = rawAudio[2*k];
-                double imaginary = rawAudio[2*k + 1];
+                double real = fftCoefficients[2*k];
+                double imaginary = fftCoefficients[2*k + 1];
                 double magnitude = Math.sqrt(Math.pow(real, 2) + Math.pow(imaginary, 2));
 
-                if (frequency >= minFreq && frequency <= maxFreq && magnitude >= MAGNITUDE_THRESHOLD) {
-                    addEntry(visualizerDigital, new Entry((float) frequency, (float) magnitude));
-                } else {
-                    addEntry(visualizerDigital, new Entry((float)frequency, 0));
-                }
-
+                addEntry(visualizerDigital, new Entry((float) frequency, (float) magnitude));
             }
-//            addEntry(visualizerDigital, new Entry(((float)rawAudio.length / 2) * frequencyResolution, (float)rawAudio[1]));
+//            addEntry(visualizerDigital, new Entry(((float)fftCoefficients.length / 2) * frequencyResolution, (float)fftCoefficients[1]));
         } else {
-//            addEntry(visualizerDigital, new Entry(0, (float) rawAudio[0]));
-            for (int k = 1; k < (rawAudio.length - 1) / 2; k++) {
+//            addEntry(visualizerDigital, new Entry(0, (float)fftCoefficients[0]));
+            for (int k = 1; k < (fftCoefficients.length - 1) / 2; k++) {
                 double frequency = k * frequencyResolution;
 
-                double real = rawAudio[2*k];
-                double imaginary = rawAudio[2*k + 1];
+                double real = fftCoefficients[2*k];
+                double imaginary = fftCoefficients[2*k + 1];
                 double magnitude = Math.sqrt(Math.pow(real, 2) + Math.pow(imaginary, 2));
 
-                if (frequency >= minFreq && frequency <= maxFreq && magnitude >= MAGNITUDE_THRESHOLD) {
-                    addEntry(visualizerDigital, new Entry((float)frequency, (float)magnitude));
-                } else {
-                    addEntry(visualizerDigital, new Entry((float)frequency, 0));
-                }
+                addEntry(visualizerDigital, new Entry((float)frequency, (float)magnitude));
             }
-//            addEntry(visualizerDigital, new Entry(((float)(rawAudio.length - 1) / 2) * frequencyResolution, (float)rawAudio[1]));
+//            addEntry(visualizerDigital, new Entry((((float)fftCoefficients.length - 1) / 2) * frequencyResolution, (float)fftCoefficients[1]));
         }
     }
 
@@ -307,22 +303,26 @@ public class MainActivity extends AppCompatActivity implements OnChartValueSelec
     // Recording audio
     private static final float MAX_REPORTABLE_AMP = 32767f;
     private static final float MAX_REPORTABLE_DB = 90.3087f;
+    private static final short THRESHOLD = 350;
 
-    private MediaRecorder recorder;
-    private int samplingRate = maxFreq / 2;
+    private static final int RECORDER_SAMPLERATE = 44100;
+    private static final int RECORDER_CHANNELS = AudioFormat.CHANNEL_IN_MONO;
+    private static final int RECORDER_AUDIO_ENCODING = AudioFormat.ENCODING_PCM_16BIT;
+    private AudioRecord recorder = null;
+    private Thread recordingThread = null;
 
-    private Timer recordingTimer;
-    private int PERIOD = (int) ((1.0 / samplingRate) * 1000);
-    private long tick = 0;
+    private int BufferElements2Rec = 1024; // want to play 2048 (2K) since 2 bytes we use only 1024
+    private int BytesPerElement = 2; // 2 bytes in 16bit format
+
+    private float tick = 0;
+    private static final float VISUALIZER_PERIOD = (float)0.005;
+
+    private double[] audio;
 
     // Format filename based on current date
     private Calendar calendar;
     private SimpleDateFormat dateFormat;
     private static String filePath = null;
-
-    private double[] rawAudio = null;
-    private DoubleFFT_1D fft;
-    private double MAGNITUDE_THRESHOLD = 0.4;
 
     private void startRecording() {
         visualizerAnalog.clearValues();
@@ -330,67 +330,152 @@ public class MainActivity extends AppCompatActivity implements OnChartValueSelec
 
         // Record to the external cache directory for visibility
         dateFormat = new SimpleDateFormat("yyyyMMdd_HHmmss");
-        filePath = getExternalFilesDir(null).getAbsolutePath() + "/record_" + dateFormat.format(calendar.getTime());
+        filePath = getExternalFilesDir(null).getAbsolutePath() + "/record_" + dateFormat.format(calendar.getTime()) + ".pcm";
 
-        // Initialize recorder
-        recorder = new MediaRecorder();
-        recorder.setAudioSource(MediaRecorder.AudioSource.MIC);
-        recorder.setOutputFormat(MediaRecorder.OutputFormat.AAC_ADTS);
-        recorder.setAudioEncoder(MediaRecorder.AudioEncoder.AAC);
-        recorder.setAudioSamplingRate(samplingRate);
-        recorder.setOutputFile(filePath + ".aac");
+        recorder = new AudioRecord(MediaRecorder.AudioSource.MIC,
+                RECORDER_SAMPLERATE, RECORDER_CHANNELS,
+                RECORDER_AUDIO_ENCODING, BufferElements2Rec * BytesPerElement);
 
+        recorder.startRecording();
+        isRecording = true;
+        recordingThread = new Thread(new Runnable() {
+            public void run() {
+                writeAudioDataToFile(filePath);
+            }
+        }, "AudioRecorder Thread");
+        recordingThread.start();
+    }
+    private void stopRecording() {
+        // stops the recording activity
+        if (null != recorder) {
+            isRecording = false;
+            recorder.stop();
+            recorder.release();
+            recorder = null;
+            recordingThread = null;
+
+            FFT();
+//            drawVisualizerFFT(audio);
+        }
+    }
+    //convert short to byte
+    private byte[] short2byte(short[] sData) {
+        int shortArrsize = sData.length;
+        byte[] bytes = new byte[shortArrsize * 2];
+        for (int i = 0; i < shortArrsize; i++) {
+            bytes[i * 2] = (byte) (sData[i] & 0x00FF);
+            bytes[(i * 2) + 1] = (byte) (sData[i] >> 8);
+            sData[i] = 0;
+        }
+        return bytes;
+    }
+    //convert byte to short
+    private short[] byte2short(byte[] bData) {
+        short[] shorts = new short[bData.length / 2];
+        for (int i = 0; i < shorts.length; i++) {
+            ByteBuffer bb = ByteBuffer.allocate(2);
+            bb.order(ByteOrder.LITTLE_ENDIAN);
+            bb.put(bData[i * 2]);
+            bb.put(bData[(i * 2) + 1]);
+            shorts[i] = bb.getShort(0);
+        }
+        return shorts;
+    }
+    // Write the output audio in byte
+    private void writeAudioDataToFile(String path) {
+        short[] sData = new short[BufferElements2Rec];
+
+        FileOutputStream os = null;
         try {
-            recorder.prepare();
-            recorder.start();
-        } catch (IOException e) {
+            os = new FileOutputStream(path);
+        } catch (FileNotFoundException e) {
             e.printStackTrace();
         }
 
-        recordingTimer = new Timer();
-        tick = 0;
-        recordingTimer.schedule(new TimerTask() {
-            @Override
-            public void run() {
-                try {
-                    addEntry(visualizerAnalog, new Entry((float) tick / 1000, recorder.getMaxAmplitude()));
-                    tick += PERIOD;
-                } catch (Exception e) {
-                    e.printStackTrace();
+
+        while (isRecording) {
+            // gets the voice output from microphone to byte format
+            recorder.read(sData, 0, BufferElements2Rec);
+
+            for (int i = 143; i < BufferElements2Rec; i += 220) {
+                addEntry(visualizerAnalog, new Entry(tick, sData[i]));
+                tick += VISUALIZER_PERIOD;
+            }
+
+            try {
+                // writes the data to file from buffer
+                // stores the voice buffer
+                byte[] bData = short2byte(sData);
+                os.write(bData, 0, BufferElements2Rec * BytesPerElement);
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+        try {
+            os.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+    private double[] load16BitPCMRawDataFileAsDoubleArray(File file) {
+        double[] output = null;
+        InputStream in;
+        if (file.isFile()) {
+            long size = file.length();
+            try {
+                in = new FileInputStream(file);
+                output = readStreamAsDoubleArray(in, size);
+            } catch (Exception e) {
+            }
+        } else {
+            Log.e(LOG_TAG, "PCM file not found");
+        }
+        return output;
+    }
+    private double[] readStreamAsDoubleArray(InputStream in, long size) throws IOException {
+        int bufferSize = (int) (size / 2);
+        double[] result = new double[bufferSize];
+        DataInputStream is = new DataInputStream(in);
+        for (int i = 0; i < bufferSize; i++) {
+            result[i] = is.readShort() / 32768.0;
+        }
+        return result;
+    }
+
+    private void FFT() {
+        DoubleFFT_1D fft = new DoubleFFT_1D(BufferElements2Rec);
+
+        try {
+            FileInputStream is = new FileInputStream(new File(filePath));
+            byte[] bData = new byte[BufferElements2Rec * BytesPerElement];
+
+            tick = 0;
+            while (is.read(bData, 0 , bData.length) != -1) {
+                short[] sData = byte2short(bData);
+                
+                for (int i = 143; i < BufferElements2Rec; i += 220) {
+                    addEntry(visualizerDigital, new Entry(tick, (float) sData[i]));
+                    tick += VISUALIZER_PERIOD;
                 }
             }
-        }, 0, PERIOD);
+        } catch (FileNotFoundException e) {
+            Log.e(LOG_TAG, "PCM file not found");
+        } catch (Exception e) {}
     }
-    private void stopRecording() {
-        isRecording = false;
 
-        recorder.stop();
-        recorder.release();
-        recordingTimer.cancel();
-        recorder = null;
-        Toast.makeText(getApplicationContext(), "Recording session finished", Toast.LENGTH_LONG).show();
+    // Play audio
+    private void playAudio() {
+        int bufsize = AudioTrack.getMinBufferSize(44100,
+                AudioFormat.CHANNEL_IN_MONO,
+                AudioFormat.ENCODING_PCM_16BIT);
 
-        new Thread(new Runnable() {
-            @Override
-            public void run() {
-                SoundDataUtils.ConvertAACToPCM(filePath);
-            }
-        });
-
-//        File audioFile = new File(filePath + ".pcm");
-//        rawAudio = SoundDataUtils.load16BitPCMRawDataFileAsDoubleArray(audioFile);
-//
-//        Log.i(LOG_TAG, Integer.toString(rawAudio.length));
-//
-//        new Thread(new Runnable() {
-//            @Override
-//            public void run() {
-//                fft = new DoubleFFT_1D(rawAudio.length);
-//                fft.realForward(rawAudio);
-//            }
-//        });
-//
-//        drawVisualizerFFT();
+        AudioTrack audio = new AudioTrack(AudioManager.STREAM_MUSIC,
+                RECORDER_SAMPLERATE,
+                AudioFormat.CHANNEL_IN_MONO,
+                AudioFormat.ENCODING_PCM_16BIT,
+                bufsize,
+                AudioTrack.MODE_STREAM );
+        audio.play();
     }
 
 
@@ -418,7 +503,6 @@ public class MainActivity extends AppCompatActivity implements OnChartValueSelec
                     visualizerDigital.getXAxis().setAxisMinimum(minFreq);
                 } else {
                     maxFreq = Integer.parseInt(input.getText().toString());
-                    samplingRate = maxFreq / 2;
                     visualizerDigital.getXAxis().setAxisMaximum(maxFreq);
                 }
             }
